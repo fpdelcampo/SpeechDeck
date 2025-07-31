@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "SpeechDeck",
+  "version": "0.1.0",
+  "permissions": ["tts", "storage"],
+  "host_permissions": [
+    "https://pro.x.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": [
+      "https://pro.x.com/*"
+    ],
+    "js": ["content_script.js"],
+    "run_at": "document_idle"
+  }],
+  "action": { "default_popup": "popup/popup.html" }
+}
