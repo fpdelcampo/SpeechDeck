@@ -1,0 +1,1 @@
+SpeechDeck is an extension that integrates with X Pro (formerly TweetDeck).  With SpeechDeck, you can have any new tweets in any X Pro column read to you via TTS.
