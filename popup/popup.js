@@ -8,23 +8,6 @@ const DEFAULTS = {
 };
 
 document.addEventListener("DOMContentLoaded", init);
-let currentPrefs = { ...DEFAULTS };
-
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'sync') return; // only react to sync storage
-  // reflect master toggle instantly
-  if (changes.enabled) byId('enabled').checked = !!changes.enabled.newValue;
-
-  // if column titles or toggles changed, rebuild the panel
-  if (changes.columns || changes.columnsDetected) {
-    chrome.storage.sync.get(DEFAULTS, (prefs) => {
-      currentPrefs = { ...currentPrefs, ...prefs };
-      const detectedMap = Object.fromEntries((prefs.columnsDetected || []).map(n => [n, true]));
-      const merged = { ...detectedMap, ...prefs.columns };
-      renderColumns(merged);
-    });
-  }
-});
 
 function byId(id) { return document.getElementById(id); }
 
@@ -54,14 +37,10 @@ function init() {
 			byId("rateVal").textContent = prefs.rate + "×";
 			byId("template").value = prefs.template;
 
-			// Merge detected column names (default ON) with saved toggles.
-			const detectedMap = Object.fromEntries((prefs.columnsDetected || []).map(n => [n, true]));
-			const merged = { ...detectedMap, ...prefs.columns };
-			renderColumns(merged);
-
 			updatePreview();
 		});
   	});
+	paintColumnsFromStorage();
 
   	// UI events
 	byId("rate").addEventListener("input", (e) => {
@@ -69,50 +48,69 @@ function init() {
 	});
 	byId("template").addEventListener("input", updatePreview);
 	byId("save").addEventListener("click", save);
+	byId('clearQueue').addEventListener('click', () => {
+		chrome.runtime.sendMessage({ type: 'clear-queue' });
+	});
 }
 
+function paintColumnsFromStorage() {
+  chrome.storage.sync.get({ columns: {}, columnsDetected: [] }, ({ columns, columnsDetected }) => {
+    const visible = {};
+    columnsDetected.forEach(t => { visible[t] = columns[t] !== false; }); // default ON
+    renderColumns(visible);
+  });
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'sync') return;
+  if (changes.enabled) byId('enabled').checked = changes.enabled.newValue;
+  if (changes.columns || changes.columnsDetected) {
+    paintColumnsFromStorage();   // repaint whenever either key changes
+  }
+});
+
 function renderColumns(map) {
-  const wrap = byId("columns");
-  wrap.innerHTML = "";
-  const entries = Object.entries(map);
-  if (!entries.length) {
-    wrap.innerHTML = '<p class="hint">No columns yet. Open X Pro.</p>';
-    return;
-  }
-  for (const [name, enabled] of entries) {
-    const label = document.createElement("label");
-    label.className = "col-item";
+	const wrap = byId("columns");
+	wrap.innerHTML = "";
+	const entries = Object.entries(map);
+	if (!entries.length) {
+		wrap.innerHTML = '<p class="hint">No columns yet. Open X Pro.</p>';
+		return;
+	}
+  	for (const [name, enabled] of entries) {
+		const label = document.createElement("label");
+		label.className = "col-item";
 
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.dataset.col = name;
-    cb.checked = !!enabled;
+		const cb = document.createElement("input");
+		cb.type = "checkbox";
+		cb.dataset.col = name;
+		cb.checked = !!enabled;
 
-    cb.addEventListener("change", () => {
-      // read current map, update a single key, write back
-      chrome.storage.sync.get({ columns: {} }, cur => {
-        const next = { ...cur.columns, [name]: cb.checked };
-        chrome.storage.sync.set({ columns: next });
-      });
-    });
+		cb.addEventListener("change", () => {
+		// read current map, update a single key, write back
+			chrome.storage.sync.get({ columns: {} }, cur => {
+				const next = { ...cur.columns, [name]: cb.checked };
+				chrome.storage.sync.set({ columns: next });
+			});
+		});
 
-    const span = document.createElement("span");
-    span.textContent = name;
+		const span = document.createElement("span");
+		span.textContent = name;
 
-    label.append(cb, span);
-    wrap.appendChild(label);
-  }
+		label.append(cb, span);
+		wrap.appendChild(label);
+	}
 }
 
 
 function updatePreview() {
-  const tpl = byId("template").value || DEFAULTS.template;
-  const sample = tpl
-    .replace("{time}", "11:59")
-    .replace("{author}", "ElonMusk")
-    .replace("{column}", "Elon List")
-    .replace("{tweet}", "X is cool");
-  byId("preview").textContent = sample;
+	const tpl = byId("template").value || DEFAULTS.template;
+	const sample = tpl
+		.replace("{time}", "11:59")
+		.replace("{author}", "ElonMusk")
+		.replace("{column}", "Elon List")
+		.replace("{tweet}", "X is cool");
+  	byId("preview").textContent = sample;
 }
 
 function save() {

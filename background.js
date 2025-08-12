@@ -26,9 +26,15 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
         .replace("{author}", t.author || "Someone")
         .replace("{column}", t.column || "a column")
         .replace("{tweet}",  t.tweet  || "");
-    console.log('[XPro Speaker background.js] SPEAK', text);
-    chrome.tts.speak(text, { rate: prefs.rate, voiceName: prefs.voice || undefined });
+    chrome.tts.speak(text, { rate: prefs.rate, voiceName: prefs.voice || undefined, enqueue: true });
 });
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'clear-queue') {
+    chrome.tts.stop();
+  }
+});
+
 
 async function reflectBadge() {
     await chrome.action.setBadgeText({ text: prefs.enabled ? "" : "OFF" });

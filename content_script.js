@@ -33,28 +33,48 @@ function extractTweet(article) {
     };
 }
 
-new MutationObserver(muts => {
-    for (const m of muts) {
-        for (const node of m.addedNodes) {
-            if (!(node instanceof HTMLElement)) continue;
+function waitForQuiet(ms = 500) {
+    return new Promise(resolve => {
+        let t;
+        const mo = new MutationObserver(() => {
+            clearTimeout(t);
+            t = setTimeout(done, ms);
+        });
+        function done() { mo.disconnect(); resolve(); }
+        mo.observe(document.body, { childList: true, subtree: true });
+        t = setTimeout(done, ms);
+    });
+}
 
-            const article = node.matches?.('[data-testid="tweet"], article')
-                ? node
-                : node.querySelector?.('[data-testid="tweet"], article');
+(async function startAfterInitialLoad() {
+    await waitForQuiet(1000);           
+    attachTweetObserver();             
+})();
 
-            if (!article) continue;
-            if (!article.querySelector('[data-testid="tweetText"]')) continue;
+function attachTweetObserver() {
+    new MutationObserver(muts => {
+        for (const m of muts) {
+            for (const node of m.addedNodes) {
+                if (!(node instanceof HTMLElement)) continue;
 
-            const infoBase = extractTweet(article);
-            if (!infoBase) continue;
+                const article = node.matches?.('[data-testid="tweet"], article')
+                    ? node
+                    : node.querySelector?.('[data-testid="tweet"], article');
 
-            const column = normTitle(getColumnName(article));
-            const info = { column, ...infoBase };
+                if (!article) continue;
+                if (!article.querySelector('[data-testid="tweetText"]')) continue;
 
-            chrome.runtime.sendMessage({ type: 'new-tweet', info });
+                const infoBase = extractTweet(article);
+                if (!infoBase) continue;
+
+                const column = normTitle(getColumnName(article));
+                const info = { column, ...infoBase };
+
+                chrome.runtime.sendMessage({ type: 'new-tweet', info });
+            }
         }
-    }
-}).observe(document.body, { childList: true, subtree: true });
+    }).observe(document.body, { childList: true, subtree: true });
+}
 
 function debounce(fn, ms) {
     let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
